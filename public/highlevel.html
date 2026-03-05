@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JioTV Live Ultra</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.ui.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/controls.min.css" crossorigin="anonymous">
+
+    <style>
+        :root {
+            --accent: #ff004c;
+            --bg: #050505;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --glass: rgba(20, 20, 20, 0.8);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: var(--bg);
+            color: #fff;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            overflow-x: hidden;
+            line-height: 1.5;
+        }
+
+        /* --- HEADER & NAVIGATION --- */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            padding: 1rem 5%;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .brand { font-size: 1.5rem; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+
+        #searchInput {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 0.6rem 1.2rem;
+            border-radius: 50px;
+            color: #fff;
+            width: 100%;
+            max-width: 300px;
+            transition: 0.3s;
+        }
+
+        #searchInput:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,0.15); }
+
+        /* --- GRID LAYOUT --- */
+        #gridView { padding: 2rem 5%; animation: fadeIn 0.5s ease; }
+        
+        #jiotvGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .channel-card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.3s, border-color 0.3s;
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+
+        .channel-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--accent);
+            background: rgba(255,255,255,0.08);
+        }
+
+        .channel-card img {
+            width: 100%;
+            aspect-ratio: 16/9;
+            object-fit: contain;
+            background: #000;
+            padding: 10px;
+        }
+
+        .channel-card .name {
+            padding: 0.8rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* --- FULLSCREEN PLAYER VIEW --- */
+        #playerView {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .player-controls-top {
+            position: absolute;
+            top: 0; width: 100%;
+            padding: 1.5rem;
+            z-index: 1001;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+            pointer-events: none;
+        }
+
+        .back-btn {
+            pointer-events: auto;
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 0, 76, 0.3);
+        }
+
+        .shaka-video-container { width: 100%; height: 100%; }
+        video { width: 100%; height: 100%; }
+
+        .hidden { display: none !important; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            header { justify-content: center; gap: 1rem; }
+            #searchInput { max-width: 100%; }
+            #jiotvGrid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="gridView">
+        <header>
+            <div class="brand">JioTV Live</div>
+            <input type="text" id="searchInput" placeholder="Search 600+ channels..." onkeyup="filterChannels()">
+        </header>
+
+        <div style="margin: 2rem 0 1rem; font-weight: bold; color: rgba(255,255,255,0.6);">DISCOVER CHANNELS</div>
+        <div id="jiotvGrid">
+            <p style="grid-column: 1/-1; text-align: center; padding: 3rem;">Initializing Streams...</p>
+        </div>
+    </div>
+
+    <div id="playerView" class="hidden">
+        <div class="player-controls-top">
+            <button class="back-btn" onclick="closePlayer()">✕ CLOSE</button>
+        </div>
+        <div class="shaka-video-container" data-shaka-player-container>
+            <video autoplay playsinline id="video" data-shaka-player></video>
+        </div>
+    </div>
+
+    <script>
+        let allChannels = [];
+        let player = null;
+        let ui = null;
+
+        // 1. Initialization
+        async function initApp() {
+            shaka.polyfill.installAll();
+            if (!shaka.Player.isBrowserSupported()) {
+                alert("Browser not supported for high-end streaming.");
+                return;
+            }
+            loadPlaylist();
+        }
+
+        // 2. Data Fetching
+        async function loadPlaylist() {
+            try {
+                const res = await fetch('https://raw.githubusercontent.com/ascal-dev/matchlinks-jsontom3u/main/jstarworldwideweb.m3u');
+                const text = await res.text();
+                allChannels = parseM3U(text);
+                renderChannels(allChannels);
+            } catch (err) {
+                document.getElementById('jiotvGrid').innerHTML = "<p>Network Error. Check your connection.</p>";
+            }
+        }
+
+        // 3. M3U Parser (Logic Refined)
+        function parseM3U(txt) {
+            const channels = [];
+            const lines = txt.split('\n');
+            let current = null;
+            let props = {};
+
+            lines.forEach(line => {
+                line = line.trim();
+                if (line.startsWith('#EXTINF:')) {
+                    current = { 
+                        name: line.split(',')[1] || "Unnamed",
+                        logo: (line.match(/tvg-logo="([^"]+)"/) || [])[1] || ""
+                    };
+                    props = {};
+                } else if (line.startsWith('#KODIPROP:')) {
+                    const [_, k, v] = line.match(/#KODIPROP:([^=]+)=(.+)/) || [];
+                    if (k) { props.kodi = props.kodi || {}; props.kodi[k] = v; }
+                } else if (line.startsWith('#EXTHTTP:')) {
+                    try { props.http = JSON.parse(line.replace('#EXTHTTP:', '')); } catch(e){}
+                } else if (line && !line.startsWith('#') && current) {
+                    current.url = line;
+                    current.props = props;
+                    channels.push(current);
+                    current = null;
+                }
+            });
+            return channels;
+        }
+
+        // 4. UI Rendering
+        function renderChannels(list) {
+            const grid = document.getElementById('jiotvGrid');
+            grid.innerHTML = list.map((ch, idx) => `
+                <div class="channel-card" onclick="openPlayer(${idx})">
+                    <img src="${ch.logo}" loading="lazy" onerror="this.src='https://via.placeholder.com/150x84/222/fff?text=LIVE'">
+                    <div class="name">${ch.name}</div>
+                </div>
+            `).join('');
+        }
+
+        function filterChannels() {
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            renderChannels(allChannels.filter(c => c.name.toLowerCase().includes(q)));
+        }
+
+        // 5. Stable Player Implementation
+        async function openPlayer(index) {
+            const ch = allChannels[index];
+            const video = document.getElementById('video');
+            const container = document.querySelector('.shaka-video-container');
+
+            document.getElementById('gridView').classList.add('hidden');
+            document.getElementById('playerView').classList.remove('hidden');
+
+            if (!player) {
+                player = new shaka.Player(video);
+                ui = new shaka.ui.Overlay(player, container, video);
+                ui.configure({ 'controlPanelElements': ['play_pause', 'spacer', 'quality', 'fullscreen'] });
+
+                // Auto-retry logic for stability
+                player.addEventListener('error', (e) => {
+                    if (e.detail.severity === 2) player.retry();
+                });
+            }
+
+            // Stability & Buffer Configuration
+            player.configure({
+                streaming: {
+                    bufferingGoal: 45,        // High buffer for stability
+                    rebufferingGoal: 10,       // Prevent constant micro-stutters
+                    bufferBehind: 30,
+                    retryParameters: { maxAttempts: 10, baseDelay: 1000, backoffFactor: 2 },
+                    lowLatencyMode: false     // Priority: Stability over Latency
+                },
+                manifest: { 
+                    dash: { ignoreMinBufferTime: true },
+                    retryParameters: { maxAttempts: 10 }
+                }
+            });
+
+            // DRM Handling
+            const license = ch.props?.kodi?.['inputstream.adaptive.license_key'] || "";
+            if (license.includes(':')) {
+                const [kid, key] = license.split(':');
+                player.configure({ drm: { clearKeys: { [kid]: key } } });
+            }
+
+            // Network Filter (Cookies & Headers)
+            const cookieVal = ch.props?.http?.cookie || "";
+            player.getNetworkingEngine().clearAllRequestFilters();
+            player.getNetworkingEngine().registerRequestFilter((type, request) => {
+                request.headers['User-Agent'] = "plaYtv/7.1.3 (Linux;Android 13) ygx/824.1 ExoPlayerLib/824.0";
+                request.headers['Referer'] = "https://www.jiotv.com/";
+                
+                if (cookieVal) {
+                    request.headers['Cookie'] = cookieVal;
+                    // Append cookie to segment URIs if necessary for CDN auth
+                    if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT && !request.uris[0].includes('__hdnea__')) {
+                        const sep = request.uris[0].includes('?') ? '&' : '?';
+                        request.uris[0] += sep + cookieVal;
+                    }
+                }
+            });
+
+            try {
+                await player.load(ch.url);
+                video.play();
+            } catch (err) {
+                console.error("Playback failed", err);
+                alert("This stream is currently unavailable.");
+                closePlayer();
+            }
+        }
+
+        function closePlayer() {
+            const video = document.getElementById('video');
+            video.pause();
+            if (player) player.unload();
+            document.getElementById('playerView').classList.add('hidden');
+            document.getElementById('gridView').classList.remove('hidden');
+        }
+
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
