@@ -67,7 +67,9 @@
     </style>
 </head>
 <body>
-
+    <div><a href="./Cricket.html">Cricket</a></div>
+    <div><a href="./cloudy77.html">Coudy Jio</a></div>
+    <div><a href="./highlevel.html">High Level</a></div>
     <div id="gridView">
         <div class="header">
             <h2>JioTV Live</h2>
@@ -94,7 +96,7 @@
         // 1. Fetch Playlist
         async function loadPlaylist() {
             try {
-                const response = await fetch('https://raw.githubusercontent.com/SDJJN/auto-m3u-bot/main/jtv.m3u');
+                const response = await fetch('https://raw.githubusercontent.com/ascal-dev/matchlinks-jsontom3u/main/jstarworldwideweb.m3u');
                 const text = await response.text();
                 allChannels = parseM3U(text);
                 renderChannels(allChannels);
@@ -186,16 +188,64 @@
             const cookieVal = ch.props?.http?.cookie || "";
 
             player.configure({
-                drm: drmConfig,
                 streaming: {
-                    lowLatencyMode: true,
-                    bufferingGoal: 15,
-                    rebufferingGoal: 2,
-                    bufferBehind: 15,
-                    retryParameters: { timeout: 10000, maxAttempts: 5, baseDelay: 300, backoffFactor: 1.2 },
-                    segmentRequestTimeout: 8000,
-                    useNativeHlsOnSafari: true
-                }
+                                lowLatencyMode: false,
+                            
+                                bufferingGoal: 40,
+                                rebufferingGoal: 5,
+                                bufferBehind: 30,
+                            
+                                segmentRequestTimeout: 20000,
+                            
+                                retryParameters: {
+                                  timeout: 20000,
+                                  maxAttempts: 10,
+                                  baseDelay: 500,
+                                  backoffFactor: 1.5,
+                                  fuzzFactor: 0.5
+                                },
+                            
+                                useNativeHlsOnSafari: true
+                              },
+                            
+                              manifest: {
+                                retryParameters: {
+                                  timeout: 20000,
+                                  maxAttempts: 8,
+                                  baseDelay: 500,
+                                  backoffFactor: 1.5,
+                                  fuzzFactor: 0.5
+                                }
+                              },
+                            
+                              drm: {
+                                retryParameters: {
+                                  timeout: 20000,
+                                  maxAttempts: 8,
+                                  baseDelay: 500,
+                                  backoffFactor: 1.5,
+                                  fuzzFactor: 0.5
+                                }
+                              },
+                            
+                              streaming: {
+                                retryParameters: {
+                                  timeout: 20000,
+                                  maxAttempts: 10,
+                                  baseDelay: 500,
+                                  backoffFactor: 1.5,
+                                  fuzzFactor: 0.5
+                                }
+                              },
+                            
+                              abr: {
+                                enabled: true,
+                                defaultBandwidthEstimate: 1500000,
+                                switchInterval: 8,
+                                bandwidthUpgradeTarget: 0.85,
+                                bandwidthDowngradeTarget: 0.95
+                              }
+
             });
 
             // Network Filter Logic (The specific ones you requested)
