@@ -95,7 +95,7 @@
         // 1. Fetch Playlist
         async function loadPlaylist() {
             try {
-                const response = await fetch('https://netx.streamstar18.workers.dev/zio1');
+                const response = await fetch('https://raw.githubusercontent.com/alex4528x/m3u/main/jstar.m3u');
                 const text = await response.text();
                 allChannels = parseM3U(text);
                 renderChannels(allChannels);
