@@ -110,7 +110,7 @@
             const lines = txt.split('\n');
             let current = null;
             let props = {};
-
+        
             lines.forEach(line => {
                 line = line.trim();
                 if (line.startsWith('#EXTINF:')) {
@@ -125,18 +125,24 @@
                         if (!props.kodi) props.kodi = {};
                         props.kodi[match[1]] = match[2];
                     }
-                } else if (line.startsWith('#EXTHTTP:')) {
-                    try { props.http = JSON.parse(line.replace('#EXTHTTP:', '')); } catch(e){}
                 } else if (line && !line.startsWith('#') && current) {
-                    current.url = line;
+                    // Check for cookie inside the URL line (e.g., URL|cookie=...)
+                    const parts = line.split('|cookie=');
+                    current.url = parts[0].split('&xxx=')[0]; // Clean URL
+                    
+                    if (!props.http) props.http = {};
+                    if (parts[1]) {
+                        props.http.cookie = parts[1]; // Store extracted cookie
+                    }
+                    
                     current.props = props;
                     channels.push(current);
                     current = null;
+                    props = {};
                 }
             });
             return channels;
         }
-
         // 3. Display Grid
         function renderChannels(list) {
             const grid = document.getElementById('jiotvGrid');
