@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JioTV Stream Player - Fixed</title>
+    <title>JioTV Ultra Player</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.ui.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/controls.min.css" crossorigin="anonymous">
@@ -16,13 +16,13 @@
             font-family: system-ui, -apple-system, sans-serif; 
             height: 100vh;
             width: 100vw;
-            overflow-x: hidden;
+            overflow: hidden;
         }
 
         .hidden { display: none !important; }
 
         /* GRID VIEW */
-        #gridView { padding: 20px; }
+        #gridView { padding: 20px; height: 100vh; overflow-y: auto; }
         .header { text-align: center; padding: 10px 0 20px; }
         #searchInput {
             width: 90%; max-width: 500px; padding: 12px 20px; 
@@ -48,7 +48,7 @@
         .back-btn {
             position: absolute; top: 15px; left: 15px; z-index: 10001;
             background: rgba(0,0,0,0.8); color: white; border: 1px solid #444;
-            padding: 10px 20px; border-radius: 20px; cursor: pointer; font-size: 14px;
+            padding: 10px 20px; border-radius: 20px; cursor: pointer;
         }
         .shaka-video-container { width: 100%; height: 100%; }
         video { width: 100%; height: 100%; }
@@ -69,15 +69,15 @@
             <input type="text" id="searchInput" placeholder="Search channels..." onkeyup="filterChannels()">
         </div>
         <div id="jiotvGrid">
-            <p style="text-align:center; grid-column: 1/-1;">Loading Channels...</p>
+            <p style="text-align:center;">Fetching channels...</p>
         </div>
     </div>
 
     <div id="playerView" class="hidden">
-        <button class="back-btn" onclick="closePlayer()">✕ Back to List</button>
+        <button class="back-btn" onclick="closePlayer()">✕ Close</button>
         <div class="shaka-video-container" data-shaka-player-container>
             <video autoplay playsinline id="video" data-shaka-player></video>
-            <div id="manualPlayButton">CLICK TO UNMUTE & PLAY</div>
+            <div id="manualPlayButton">CLICK TO PLAY</div>
         </div>
     </div>
 
@@ -86,7 +86,7 @@
         let player = null;
         let ui = null;
 
-        // 1. Load Playlist
+        // 1. Fetch and Parse
         async function loadPlaylist() {
             try {
                 const response = await fetch('https://raw.githubusercontent.com/ascal-dev/matchlinks-jsontom3u/main/ascaljtv.m3u');
@@ -94,11 +94,10 @@
                 allChannels = parseM3U(text);
                 renderChannels(allChannels);
             } catch (err) {
-                document.getElementById('jiotvGrid').innerHTML = "<p>Error loading playlist. Check CORS.</p>";
+                document.getElementById('jiotvGrid').innerHTML = "<p>Failed to load playlist. Check CORS.</p>";
             }
         }
 
-        // 2. Parser Fixed for your specific URL structure
         function parseM3U(txt) {
             const channels = [];
             const lines = txt.split('\n');
@@ -120,14 +119,17 @@
                         props.kodi[match[1]] = match[2];
                     }
                 } else if (line && !line.startsWith('#') && current) {
-                    // Extracting the cookie from the URL string
-                    // Example: index.mpd?#__hdnea__=...&xxx=|cookie=VAL
-                    const cookieMatch = line.split('|cookie=');
-                    current.url = cookieMatch[0].split('&xxx=')[0]; // Clean the URL
+                    // AGGRESSIVE EXTRACTION:
+                    // Look for |cookie= (standard) OR %7Ccookie= (URL encoded)
+                    const splitChar = line.includes('|cookie=') ? '|cookie=' : '%7Ccookie=';
+                    const urlParts = line.split(splitChar);
+                    
+                    // Clean the manifest URL (remove the placeholder marker)
+                    current.url = urlParts[0].split('&xxx=')[0];
                     
                     if (!props.http) props.http = {};
-                    if (cookieMatch[1]) {
-                        props.http.cookie = cookieMatch[1];
+                    if (urlParts[1]) {
+                        props.http.cookie = urlParts[1].trim(); 
                     }
                     
                     current.props = props;
@@ -143,7 +145,7 @@
             const grid = document.getElementById('jiotvGrid');
             grid.innerHTML = list.map((ch) => `
                 <div class="channel-card" onclick="openPlayer('${encodeURIComponent(JSON.stringify(ch))}')">
-                    <img src="${ch.logo}" onerror="this.src='https://via.placeholder.com/150x84?text=Live+TV'">
+                    <img src="${ch.logo}" onerror="this.src='https://via.placeholder.com/150x84?text=JioTV'">
                     <div class="name">${ch.name}</div>
                 </div>
             `).join('');
@@ -155,24 +157,28 @@
             renderChannels(filtered);
         }
 
-        // 3. Player Logic
+        // 2. Aggressive Player Logic
         async function openPlayer(encodedChannel) {
             const ch = JSON.parse(decodeURIComponent(encodedChannel));
             const video = document.getElementById('video');
             const manualBtn = document.getElementById('manualPlayButton');
+            const cookieVal = ch.props?.http?.cookie || "";
             
             document.getElementById('gridView').classList.add('hidden');
             document.getElementById('playerView').classList.remove('hidden');
 
             shaka.polyfill.installAll();
             
-            if (!player) {
-                player = new shaka.Player(video);
-                const container = document.querySelector('.shaka-video-container');
-                ui = new shaka.ui.Overlay(player, container, video);
+            // Always destroy previous instance to clear old filters
+            if (player) {
+                await player.destroy();
             }
 
-            // DRM Key Extraction
+            player = new shaka.Player(video);
+            const container = document.querySelector('.shaka-video-container');
+            ui = new shaka.ui.Overlay(player, container, video);
+
+            // DRM Setup
             let drmConfig = { clearKeys: {} };
             const licenseKey = ch.props?.kodi?.['inputstream.adaptive.license_key'] || "";
             if (licenseKey.includes(':')) {
@@ -182,25 +188,29 @@
 
             player.configure({
                 drm: drmConfig,
-                streaming: { rebufferingGoal: 3 }
+                streaming: { 
+                    bufferingGoal: 10,
+                    jumpLargeGaps: true
+                }
             });
 
-            // CRITICAL: Injecting the cookie into the Request URL
-            const cookieVal = ch.props?.http?.cookie || "";
-
+            // AGGRESSIVE INTERCEPTION
             player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                // Browsers block the 'Cookie' header on cross-origin requests
-                // So we append the token as a query parameter to every request (MPD and Segments)
                 if (cookieVal) {
-                    const uri = request.uris[0];
-                    const separator = uri.includes('?') ? '&' : '?';
-                    if (!uri.includes('__hdnea__')) {
-                        request.uris[0] = uri + separator + cookieVal;
-                    }
+                    // Rewrite every URL to include the cookie params
+                    request.uris = request.uris.map(uri => {
+                        if (uri.includes('__hdnea__')) return uri; // Don't double append
+                        const sep = uri.includes('?') ? '&' : '?';
+                        return uri + sep + cookieVal;
+                    });
+
+                    // Try to set header (will fail on cross-origin, but good for proxies)
+                    request.headers['Cookie'] = cookieVal;
                 }
                 
-                // Set User-Agent if your browser/proxy allows it
+                // Spoof Headers
                 request.headers['User-Agent'] = "plaYtv/7.1.3 (Linux;Android 13) ygx/824.1 ExoPlayerLib/824.0";
+                request.headers['Referer'] = "https://www.jiotv.com/";
             });
 
             manualBtn.onclick = () => {
@@ -210,20 +220,17 @@
             };
 
             try {
-                await player.load(ch.url);
-                video.play().catch(() => {
-                    manualBtn.style.display = 'block';
-                });
+                // Manually append cookie to the manifest load call to ensure 100% success on first hit
+                const manifestUrl = ch.url.includes('?') ? `${ch.url}&${cookieVal}` : `${ch.url}?${cookieVal}`;
+                await player.load(manifestUrl);
+                video.play().catch(() => { manualBtn.style.display = 'block'; });
             } catch (e) {
                 console.error("Load failed", e);
-                alert("This stream requires a CORS proxy or extension to play in a browser.");
             }
         }
 
         function closePlayer() {
-            const video = document.getElementById('video');
-            video.pause();
-            if (player) player.getNetworkingEngine().clearAllRequestFilters();
+            document.getElementById('video').pause();
             document.getElementById('playerView').classList.add('hidden');
             document.getElementById('gridView').classList.remove('hidden');
             document.getElementById('manualPlayButton').style.display = 'none';
