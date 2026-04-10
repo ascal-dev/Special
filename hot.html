@@ -3,79 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream Engine | MPD + Cookies</title>
-    
+    <title>Hotstar Ultra Bypass</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
-    
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        #video-container { width: 95%; max-width: 1000px; aspect-ratio: 16/9; background: #111; position: relative; border: 1px solid #333; }
-        video { width: 100%; height: 100%; }
-        .overlay-status { position: absolute; top: 10px; left: 10px; z-index: 10; font-size: 12px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 4px; pointer-events: none; }
+        body { margin: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: #fff; font-family: sans-serif; }
+        #video-container { width: 90%; max-width: 900px; aspect-ratio: 16/9; border: 1px solid #222; }
+        #status { margin-bottom: 10px; color: #00ff88; font-family: monospace; }
+        select { margin-top: 15px; padding: 10px; background: #111; color: #fff; border: 1px solid #333; width: 300px; }
     </style>
 </head>
 <body>
 
+    <div id="status">Bypass Engine: Ready</div>
     <div data-shaka-player-container id="video-container">
-        <div class="overlay-status" id="status">Syncing Cookies...</div>
-        <video data-shaka-player id="video" autoplay></video>
+        <video data-shaka-player id="video" autoplay style="width:100%; height:100%"></video>
     </div>
+    <select id="channelList"><option>Fetching Streams...</option></select>
 
     <script>
-        const RAW_DRM = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/drm.json';
-        const RAW_COOKIE = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/cookie.json';
+        const COOKIE_JSON = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/cookie.json';
+        const DRM_JSON = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/drm.json';
 
-        async function initStream() {
+        let player;
+
+        async function initApp() {
             shaka.polyfill.installAll();
 
             const video = document.getElementById('video');
             const container = document.getElementById('video-container');
-            const status = document.getElementById('status');
-            
-            const player = new shaka.Player(video);
+            player = new shaka.Player(video);
             const ui = new shaka.ui.Overlay(player, container, video);
 
             try {
-                // 1. Fetch Dynamic Data
-                const [drm, cookieData] = await Promise.all([
-                    fetch(RAW_DRM).then(res => res.json()),
-                    fetch(RAW_COOKIE).then(res => res.json())
+                const [cookieData, drmData] = await Promise.all([
+                    fetch(COOKIE_JSON).then(r => r.json()),
+                    fetch(DRM_JSON).then(r => r.json())
                 ]);
 
-                // 2. The Core Request Logic: Binding Cookies to the .mpd and segments
+                // --- THE URL REWRITE ENGINE ---
                 player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                    // This injects your cookies into the .mpd manifest request AND all following segments
-                    request.headers['Cookie'] = cookieData.Cookie;
-                    request.headers['Origin'] = cookieData.Origin;
-                    request.headers['Referer'] = cookieData.Referer;
-                    
-                    // Essential for passing cookies cross-domain
-                    request.allowCrossDomainCredentials = true;
-                });
+                    // Extract the raw cookie string
+                    const cookieStr = cookieData.Cookie;
+                    const ua = "Hotstar;in.startv.hotstar/25.02.24.8.11169 (Android/15)";
+                    const origin = cookieData.Origin;
+                    const referer = cookieData.Referer;
 
-                // 3. Select first channel from your drm.json
-                const channel = drm[0]; 
-                const [kid, key] = channel.key.split(':');
+                    // Construct the decoration string
+                    // We use encodeURIComponent to ensure special characters (~, =, /) don't break the URL
+                    const decoration = `|Cookie=${encodeURIComponent(cookieStr)}&User-agent=${encodeURIComponent(ua)}&Origin=${encodeURIComponent(origin)}&Referer=${encodeURIComponent(referer)}`;
 
-                // 4. Configure DRM & Load
-                player.configure({
-                    drm: {
-                        clearKeys: { [kid]: key }
+                    // Append to the URL. If URL already has ?, use &, else use ?
+                    if (request.uris[0].includes('?')) {
+                        request.uris[0] += `&${decoration}`;
+                    } else {
+                        request.uris[0] += `?${decoration}`;
                     }
                 });
 
-                status.innerText = `Streaming: ${channel.name} (Auth Injected)`;
-                await player.load(channel.url);
+                // Populate UI
+                const selector = document.getElementById('channelList');
+                selector.innerHTML = '';
+                drmData.forEach((ch, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.innerText = ch.name;
+                    selector.appendChild(opt);
+                });
+
+                selector.onchange = () => loadChannel(drmData[selector.value]);
+                
+                // Load default
+                loadChannel(drmData[0]);
 
             } catch (e) {
-                status.innerText = "Auth Error: Check Console";
-                console.error("Stream failed:", e);
+                document.getElementById('status').innerText = "Initialization Error";
+                console.error(e);
             }
         }
 
-        document.addEventListener('shaka-ui-loaded', initStream);
-        document.addEventListener('DOMContentLoaded', () => { if (window.shaka && !window.player) initStream(); });
+        async function loadChannel(ch) {
+            document.getElementById('status').innerText = `Injecting Auth: ${ch.name}`;
+            const [kid, key] = ch.key.split(':');
+
+            player.configure({
+                drm: {
+                    clearKeys: { [kid]: key }
+                },
+                streaming: {
+                    lowLatencyMode: true,
+                    jumpLargeGaps: true
+                }
+            });
+
+            try {
+                await player.load(ch.url);
+                document.getElementById('status').innerText = `Playing: ${ch.name}`;
+            } catch (e) {
+                document.getElementById('status').innerText = `Error ${e.code}: Check CORS Extension`;
+                console.error(e);
+            }
+        }
+
+        document.addEventListener('shaka-ui-loaded', initApp);
     </script>
 </body>
 </html>
