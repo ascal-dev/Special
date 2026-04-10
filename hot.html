@@ -3,166 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Shaka Streamer Pro</title>
+    <title>Advanced Hotstar Bypass Pro</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
     
     <style>
-        :root { --accent: #00ff88; }
-        body { 
-            margin: 0; background: #0a0a0a; color: #eee; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex; flex-direction: column; align-items: center; padding: 40px 20px;
-        }
-        .container { width: 100%; max-width: 1000px; }
-        
-        /* Video Container Styling */
+        body { margin: 0; background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; }
+        .main-container { display: flex; flex-direction: column; align-items: center; padding-top: 5vh; }
         #video-container { 
-            width: 100%; border-radius: 12px; overflow: hidden;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
-            background: #000; border: 1px solid #333;
+            width: 90%; max-width: 960px; aspect-ratio: 16/9;
+            background: #111; border: 1px solid #222; border-radius: 8px; overflow: hidden;
         }
-        video { width: 100%; height: 100%; }
-
-        /* UI Styling */
-        .controls-card {
-            background: #1a1a1a; padding: 20px; border-radius: 0 0 12px 12px;
-            border: 1px solid #333; border-top: none;
-        }
-        select {
-            width: 100%; padding: 12px; background: #222; color: var(--accent);
-            border: 1px solid #444; border-radius: 8px; font-size: 16px; outline: none;
-            cursor: pointer; transition: 0.3s;
-        }
-        select:hover { border-color: var(--accent); }
-        .badge {
-            display: inline-block; padding: 4px 12px; border-radius: 20px;
-            background: #333; font-size: 12px; margin-bottom: 10px; color: var(--accent);
+        .header-info { margin-bottom: 20px; text-align: center; }
+        .status-dot { height: 10px; width: 10px; background-color: #bbb; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .online { background-color: #00ff88; box-shadow: 0 0 8px #00ff88; }
+        select { 
+            margin-top: 20px; width: 300px; padding: 12px; border-radius: 5px; 
+            background: #1a1a1a; color: #00ff88; border: 1px solid #333; cursor: pointer;
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div class="badge" id="status-badge">System: Initializing</div>
-        
-        <div data-shaka-player-container id="video-container">
-            <video data-shaka-player id="video" autoplay></video>
+    <div class="main-container">
+        <div class="header-info">
+            <h2><span class="status-dot" id="dot"></span> LIVE BYPASS ENGINE</h2>
+            <div id="log" style="font-size: 12px; color: #888;">Initializing Session...</div>
         </div>
 
-        <div class="controls-card">
-            <label style="display:block; margin-bottom: 8px; font-weight: bold;">CHANNEL SELECTION</label>
-            <select id="channelSelect">
-                <option>Loading Dynamic Data...</option>
-            </select>
+        <div data-shaka-player-container id="video-container">
+            <video data-shaka-player id="video" autoplay style="width:100%; height:100%"></video>
         </div>
+
+        <select id="channelList"><option>Syncing Streams...</option></select>
     </div>
 
     <script>
-        const CONFIG = {
-            cookieUrl: 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/cookie.json',
-            drmUrl: 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/drm.json'
-        };
+        const DRM_SRC = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/drm.json';
+        const COOKIE_SRC = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/cookie.json';
 
-        let player, ui, videoElement, controls;
+        let player;
 
-        async function init() {
-            // 1. Install polyfills (Fixed the typo)
+        async function startEngine() {
             shaka.polyfill.installAll();
 
-            if (!shaka.Player.isBrowserSupported()) {
-                updateStatus("Browser not supported!");
-                return;
-            }
-
-            videoElement = document.getElementById('video');
+            const video = document.getElementById('video');
             const container = document.getElementById('video-container');
+            player = new shaka.Player(video);
+            const ui = new shaka.ui.Overlay(player, container, video);
             
-            // 2. Initialize Player & UI
-            player = new shaka.Player(videoElement);
-            ui = new shaka.ui.Overlay(player, container, videoElement);
-            controls = ui.getControls();
-
             try {
-                updateStatus("Fetching Auth & Manifest...");
-                const [cookieRes, drmRes] = await Promise.all([
-                    fetch(CONFIG.cookieUrl),
-                    fetch(CONFIG.drmUrl)
+                // Fetch dynamic data
+                const [drmResp, cookieResp] = await Promise.all([
+                    fetch(DRM_SRC).then(r => r.json()),
+                    fetch(COOKIE_SRC).then(r => r.json())
                 ]);
 
-                const auth = await cookieRes.json();
-                const channels = await drmRes.json();
-
-                // 3. Advanced Networking Configuration
+                // --- ADVANCED NETWORKING ENGINE ---
                 player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                    // Inject headers into every request
-                    request.headers['Cookie'] = auth.Cookie;
-                    request.headers['Origin'] = auth.Origin;
-                    request.headers['Referer'] = auth.Referer;
+                    // Inject Full Cookie String (includes hdntl, data, exp, hmac)
+                    request.headers['Cookie'] = cookieResp.Cookie;
                     
-                    // Specific fix for certain streaming environments
+                    // Essential Hotstar Headers
+                    request.headers['Origin'] = cookieResp.Origin;
+                    request.headers['Referer'] = cookieResp.Referer;
+                    
+                    // Bypass credentials check
                     request.allowCrossDomainCredentials = true;
+
+                    // Log activity for segments
+                    if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+                        console.log("Segment fetched with Auth Data");
+                    }
                 });
 
-                // 4. Setup Channel Switcher
-                const selector = document.getElementById('channelSelect');
+                // Populate UI
+                const selector = document.getElementById('channelList');
                 selector.innerHTML = '';
-                channels.forEach((ch, index) => {
-                    let opt = document.createElement('option');
-                    opt.value = index;
-                    opt.textContent = `▶ ${ch.name}`;
+                drmResp.forEach((ch, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.innerText = ch.name;
                     selector.appendChild(opt);
                 });
 
-                selector.onchange = () => {
-                    loadChannel(channels[selector.value]);
-                };
+                selector.onchange = () => switchStream(drmResp[selector.value]);
+                
+                // Load initial
+                switchStream(drmResp[0]);
+                document.getElementById('dot').classList.add('online');
+                document.getElementById('log').innerText = "Session Active - Headers Injected";
 
-                // Load default
-                loadChannel(channels[0]);
-                updateStatus("System: Online / Stream Live");
-
-            } catch (e) {
-                updateStatus("Critical Error: Failed to fetch JSON");
-                console.error(e);
+            } catch (err) {
+                document.getElementById('log').innerText = "Critical Error: " + err.message;
             }
         }
 
-        async function loadChannel(channel) {
-            updateStatus(`Switching to ${channel.name}...`);
+        async function switchStream(channel) {
+            document.getElementById('log').innerText = `Loading ${channel.name}...`;
             
-            // ClearKey Logic
-            const keyParts = channel.key.split(':');
-            const drmConfig = {
-                clearKeys: {
-                    [keyParts[0]]: keyParts[1]
-                }
-            };
+            // Format: KID:KEY
+            const [kid, key] = channel.key.split(':');
 
-            player.configure({ drm: drmConfig });
+            player.configure({
+                drm: {
+                    clearKeys: { [kid]: key }
+                },
+                manifest: {
+                    dash: { clockSyncUri: 'https://time.akamai.com/?iso' }
+                },
+                streaming: {
+                    // Buffering tuning for live streams
+                    rebufferingGoal: 10,
+                    bufferingGoal: 30
+                }
+            });
 
             try {
                 await player.load(channel.url);
-            } catch (error) {
-                console.error("Error Code:", error.code, error);
-                if(error.code === 1001) {
-                    updateStatus("Error: CORS / Header Blocked by Browser");
-                } else {
-                    updateStatus("Error: Playback failed");
-                }
+                document.getElementById('log').innerText = `Playing: ${channel.name}`;
+            } catch (e) {
+                document.getElementById('log').innerText = `Playback Error: ${e.code}`;
+                console.error("Shaka Error", e);
             }
         }
 
-        function updateStatus(msg) {
-            document.getElementById('status-badge').innerText = msg;
-        }
-
-        // Initialize when UI library is ready
-        document.addEventListener('shaka-ui-loaded', init);
-        // Fallback for direct loads
+        // Listen for UI ready
+        document.addEventListener('shaka-ui-loaded', startEngine);
+        // Direct fallback
         document.addEventListener('DOMContentLoaded', () => {
-            if (window.shaka && !player) init();
+            if (window.shaka && !player) startEngine();
         });
     </script>
 </body>
