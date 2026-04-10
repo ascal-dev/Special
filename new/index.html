@@ -110,13 +110,27 @@
             color: #666;
             margin-bottom: 10px;
         }
+        /* FIXED IFRAME CONTAINER */
+        .main-player-wrapper {
+            width: 100%;
+            background: #000;
+            line-height: 0; /* Removes tiny gap below iframe */
+            border-bottom: 2px solid var(--accent);
+            box-shadow: var(--shadow);
+        }
+
+        .main-player-wrapper iframe {
+            width: 100%;
+            aspect-ratio: 16 / 9; /* Keeps it responsive */
+            max-height: 80vh; /* Prevents it from being too tall on desktop */
+            border: none;
+            display: block;
+        }
     </style>
 </head>
 <body>
 
-    <h1>Global Sports Hub</h1>
-
-    <div class="iframe-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; overflow: hidden;">
+   <div class="main-player" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; overflow: hidden;">
         
         <iframe 
             src="https://allrounder-live4.pages.dev/star/star-1-hindi" 
@@ -127,7 +141,7 @@
 
     </div>
 
-    
+    <h1>Global Sports Hub</h1>
 
     <div class="grid">
     
