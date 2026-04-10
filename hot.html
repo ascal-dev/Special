@@ -3,138 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Hotstar Bypass Pro</title>
+    <title>Stream Engine | MPD + Cookies</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
     
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; }
-        .main-container { display: flex; flex-direction: column; align-items: center; padding-top: 5vh; }
-        #video-container { 
-            width: 90%; max-width: 960px; aspect-ratio: 16/9;
-            background: #111; border: 1px solid #222; border-radius: 8px; overflow: hidden;
-        }
-        .header-info { margin-bottom: 20px; text-align: center; }
-        .status-dot { height: 10px; width: 10px; background-color: #bbb; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        .online { background-color: #00ff88; box-shadow: 0 0 8px #00ff88; }
-        select { 
-            margin-top: 20px; width: 300px; padding: 12px; border-radius: 5px; 
-            background: #1a1a1a; color: #00ff88; border: 1px solid #333; cursor: pointer;
-        }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        #video-container { width: 95%; max-width: 1000px; aspect-ratio: 16/9; background: #111; position: relative; border: 1px solid #333; }
+        video { width: 100%; height: 100%; }
+        .overlay-status { position: absolute; top: 10px; left: 10px; z-index: 10; font-size: 12px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 4px; pointer-events: none; }
     </style>
 </head>
 <body>
 
-    <div class="main-container">
-        <div class="header-info">
-            <h2><span class="status-dot" id="dot"></span> LIVE BYPASS ENGINE</h2>
-            <div id="log" style="font-size: 12px; color: #888;">Initializing Session...</div>
-        </div>
-
-        <div data-shaka-player-container id="video-container">
-            <video data-shaka-player id="video" autoplay style="width:100%; height:100%"></video>
-        </div>
-
-        <select id="channelList"><option>Syncing Streams...</option></select>
+    <div data-shaka-player-container id="video-container">
+        <div class="overlay-status" id="status">Syncing Cookies...</div>
+        <video data-shaka-player id="video" autoplay></video>
     </div>
 
     <script>
-        const DRM_SRC = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/drm.json';
-        const COOKIE_SRC = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/cookie.json';
+        const RAW_DRM = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/drm.json';
+        const RAW_COOKIE = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/cookie.json';
 
-        let player;
-
-        async function startEngine() {
+        async function initStream() {
             shaka.polyfill.installAll();
 
             const video = document.getElementById('video');
             const container = document.getElementById('video-container');
-            player = new shaka.Player(video);
-            const ui = new shaka.ui.Overlay(player, container, video);
+            const status = document.getElementById('status');
             
+            const player = new shaka.Player(video);
+            const ui = new shaka.ui.Overlay(player, container, video);
+
             try {
-                // Fetch dynamic data
-                const [drmResp, cookieResp] = await Promise.all([
-                    fetch(DRM_SRC).then(r => r.json()),
-                    fetch(COOKIE_SRC).then(r => r.json())
+                // 1. Fetch Dynamic Data
+                const [drm, cookieData] = await Promise.all([
+                    fetch(RAW_DRM).then(res => res.json()),
+                    fetch(RAW_COOKIE).then(res => res.json())
                 ]);
 
-                // --- ADVANCED NETWORKING ENGINE ---
+                // 2. The Core Request Logic: Binding Cookies to the .mpd and segments
                 player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                    // Inject Full Cookie String (includes hdntl, data, exp, hmac)
-                    request.headers['Cookie'] = cookieResp.Cookie;
+                    // This injects your cookies into the .mpd manifest request AND all following segments
+                    request.headers['Cookie'] = cookieData.Cookie;
+                    request.headers['Origin'] = cookieData.Origin;
+                    request.headers['Referer'] = cookieData.Referer;
                     
-                    // Essential Hotstar Headers
-                    request.headers['Origin'] = cookieResp.Origin;
-                    request.headers['Referer'] = cookieResp.Referer;
-                    
-                    // Bypass credentials check
+                    // Essential for passing cookies cross-domain
                     request.allowCrossDomainCredentials = true;
+                });
 
-                    // Log activity for segments
-                    if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
-                        console.log("Segment fetched with Auth Data");
+                // 3. Select first channel from your drm.json
+                const channel = drm[0]; 
+                const [kid, key] = channel.key.split(':');
+
+                // 4. Configure DRM & Load
+                player.configure({
+                    drm: {
+                        clearKeys: { [kid]: key }
                     }
                 });
 
-                // Populate UI
-                const selector = document.getElementById('channelList');
-                selector.innerHTML = '';
-                drmResp.forEach((ch, i) => {
-                    const opt = document.createElement('option');
-                    opt.value = i;
-                    opt.innerText = ch.name;
-                    selector.appendChild(opt);
-                });
-
-                selector.onchange = () => switchStream(drmResp[selector.value]);
-                
-                // Load initial
-                switchStream(drmResp[0]);
-                document.getElementById('dot').classList.add('online');
-                document.getElementById('log').innerText = "Session Active - Headers Injected";
-
-            } catch (err) {
-                document.getElementById('log').innerText = "Critical Error: " + err.message;
-            }
-        }
-
-        async function switchStream(channel) {
-            document.getElementById('log').innerText = `Loading ${channel.name}...`;
-            
-            // Format: KID:KEY
-            const [kid, key] = channel.key.split(':');
-
-            player.configure({
-                drm: {
-                    clearKeys: { [kid]: key }
-                },
-                manifest: {
-                    dash: { clockSyncUri: 'https://time.akamai.com/?iso' }
-                },
-                streaming: {
-                    // Buffering tuning for live streams
-                    rebufferingGoal: 10,
-                    bufferingGoal: 30
-                }
-            });
-
-            try {
+                status.innerText = `Streaming: ${channel.name} (Auth Injected)`;
                 await player.load(channel.url);
-                document.getElementById('log').innerText = `Playing: ${channel.name}`;
+
             } catch (e) {
-                document.getElementById('log').innerText = `Playback Error: ${e.code}`;
-                console.error("Shaka Error", e);
+                status.innerText = "Auth Error: Check Console";
+                console.error("Stream failed:", e);
             }
         }
 
-        // Listen for UI ready
-        document.addEventListener('shaka-ui-loaded', startEngine);
-        // Direct fallback
-        document.addEventListener('DOMContentLoaded', () => {
-            if (window.shaka && !player) startEngine();
-        });
+        document.addEventListener('shaka-ui-loaded', initStream);
+        document.addEventListener('DOMContentLoaded', () => { if (window.shaka && !window.player) initStream(); });
     </script>
 </body>
 </html>
