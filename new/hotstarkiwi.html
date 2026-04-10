@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hi - Odysee</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Live Stream</title>
     
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-57TPN48YM8"></script>
     <script>
@@ -14,35 +14,43 @@
     </script>
 
     <style>
-        /* Reset and prevent scrolling */
-        html, body {
+        /* Force remove all spacing and scrolls */
+        * {
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
-            background: #000;
-            overflow: hidden;
+            box-sizing: border-box;
         }
 
-        /* Fullscreen Container */
-        .video-wrapper {
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            overflow: hidden; /* Critical: stops any scrolling */
+            position: fixed; /* Critical: locks the body for mobile */
+        }
+
+        /* The container that holds the player */
+        .fullscreen-frame {
             position: absolute;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            display: block;
         }
 
         iframe {
             width: 100%;
             height: 100%;
             border: none;
+            overflow: hidden;
         }
     </style>
 </head>
 <body>
 
-    <div class="video-wrapper">
+    <div class="fullscreen-frame">
         <iframe 
             src="https://player.kick.com/abhi745" 
             allow="autoplay; encrypted-media; fullscreen; picture-in-picture" 
@@ -54,7 +62,7 @@
         (function(s) {
             s.dataset.zone = '10603308';
             s.src = 'https://bvtpk.com/tag.min.js';
-            ([document.documentElement, document.body].filter(Boolean).pop().appendChild(s));
+            document.body.appendChild(s);
         })(document.createElement('script'));
     </script>
 
