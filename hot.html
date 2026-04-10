@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Shaka Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            background: #121212; 
+            color: white; 
+            font-family: sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 20px;
+        }
+        #video-wrapper { width: 100%; max-width: 800px; background: #000; position: relative; }
+        video { width: 100%; aspect-ratio: 16/9; }
+        #controls { margin-top: 20px; width: 100%; max-width: 800px; }
+        select { 
+            width: 100%; 
+            padding: 10px; 
+            background: #333; 
+            color: white; 
+            border: 1px solid #555; 
+            border-radius: 4px; 
+            font-size: 16px;
+        }
+        .status { margin-bottom: 10px; font-size: 0.9em; color: #aaa; }
+    </style>
+</head>
+<body>
+
+    <h2>Live Sports Stream</h2>
+    <div class="status" id="status">Initializing...</div>
+
+    <div id="video-wrapper">
+        <video id="video" controls autoplay></video>
+    </div>
+
+    <div id="controls">
+        <label for="channelSelect">Select Channel:</label>
+        <select id="channelSelect">
+            <option value="">Loading channels...</option>
+        </select>
+    </div>
+
+    <script>
+        // Raw GitHub URLs
+        const COOKIE_URL = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/cookie.json';
+        const DRM_URL = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/drm.json';
+
+        let player;
+        let videoElement;
+        let authData = {};
+
+        async function initApp() {
+            shaka.polyfil.installAll();
+            if (!shaka.Player.isBrowserSupported()) {
+                alert('Browser not supported');
+                return;
+            }
+
+            videoElement = document.getElementById('video');
+            player = new shaka.Player(videoElement);
+            const status = document.getElementById('status');
+
+            try {
+                // 1. Fetch Dynamic Data
+                status.innerText = "Fetching configuration...";
+                const [cookieRes, drmRes] = await Promise.all([
+                    fetch(COOKIE_URL),
+                    fetch(DRM_URL)
+                ]);
+
+                authData = await cookieRes.json();
+                const channels = await drmRes.json();
+
+                // 2. Setup Networking Engine (Headers)
+                player.getNetworkingEngine().registerRequestFilter((type, request) => {
+                    request.headers['Cookie'] = authData.Cookie;
+                    request.headers['Origin'] = authData.Origin;
+                    request.headers['Referer'] = authData.Referer;
+                });
+
+                // 3. Populate UI
+                const selector = document.getElementById('channelSelect');
+                selector.innerHTML = ''; // Clear loading msg
+                channels.forEach(ch => {
+                    let opt = document.createElement('option');
+                    opt.value = JSON.stringify(ch);
+                    opt.textContent = ch.name;
+                    selector.appendChild(opt);
+                });
+
+                // 4. Handle Channel Changes
+                selector.addEventListener('change', (e) => {
+                    const channel = JSON.parse(e.target.value);
+                    loadStream(channel);
+                });
+
+                // Load first channel by default
+                status.innerText = "Ready.";
+                loadStream(channels[0]);
+
+            } catch (err) {
+                status.innerText = "Error loading config: " + err.message;
+                console.error(err);
+            }
+        }
+
+        async function loadStream(channel) {
+            const [kid, key] = channel.key.split(':');
+            
+            // Configure DRM for the specific channel
+            player.configure({
+                drm: {
+                    clearKeys: { [kid]: key }
+                }
+            });
+
+            try {
+                await player.load(channel.url);
+                console.log(`Loaded: ${channel.name}`);
+            } catch (e) {
+                console.error('Error loading stream', e);
+                alert("Playback failed. Check console for CORS/Cookie errors.");
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
