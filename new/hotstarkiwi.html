@@ -3,14 +3,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Star Sports // Fixed</title>
+    <title>Star Sports // Titan Player</title>
     <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.16.2/dist/shaka-player.ui.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@4.16.2/dist/controls.css"/>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{background:#000;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;}
-        #player-container{width:100%;height:100%;}
-        video{width:100%;height:100%;}
+        body{background:#000;height:100vh;overflow:hidden;font-family:sans-serif}
+        #player-container{width:100%;height:100%;background:#000}
+        video{width:100%;height:100%}
     </style>
 </head>
 <body>
@@ -21,7 +21,6 @@
 
 <script>
 const CONFIG = {
-    // CHANGE THIS TO YOUR WORKER URL
     proxy: "https://hot.godess.workers.dev/?url=",
     streamUrl: "https://livetv.hotstar.com/mp1/gec-india-1540065782/fce958099ca84fc3b980e651a4a668a8/index.mpd",
     keyId: "b7cdde012ce04e90a08b90622e020000",
@@ -29,54 +28,63 @@ const CONFIG = {
     cookieUrl: "https://raw.githubusercontent.com/ascal-dev/matchlinks-jsontom3u/main/cookies.json"
 };
 
-async function initPlayer() {
+async function initApp() {
     shaka.polyfill.installAll();
     if (!shaka.Player.isBrowserSupported()) return;
 
     const video = document.getElementById('video');
     const container = document.getElementById('player-container');
     const player = new shaka.Player();
-    await player.attach(video);
-
+    
+    // UI Setup
     const ui = new shaka.ui.Overlay(player, container, video);
+    ui.configure({ 'controlPanelElements': ["play_pause", "mute", "quality", "fullscreen"] });
 
-    // Fetch the cookie first
+    // 1. Fetch Authorization Data
     let cookieValue = "";
     try {
         const res = await fetch(CONFIG.cookieUrl);
         const data = await res.json();
         cookieValue = data.cookie || "";
-    } catch (e) { console.error("Cookie fetch failed"); }
+    } catch (e) { console.warn("Could not fetch cookies"); }
 
+    // 2. Configure DRM & Performance
     player.configure({
         drm: { clearKeys: { [CONFIG.keyId]: CONFIG.key } },
-        streaming: { lowLatencyMode: true }
+        streaming: {
+            bufferingGoal: 15,
+            rebufferingGoal: 2,
+            lowLatencyMode: true
+        }
     });
 
-    // The Filter that forces everything through the proxy
+    // 3. The Proxy Filter
     player.getNetworkingEngine().registerRequestFilter((type, request) => {
-        let originalUri = request.uris[0];
-        
-        // Append token if missing
-        if (cookieValue && !originalUri.includes("__hdnea__")) {
-            let token = cookieValue.startsWith("__hdnea__=") ? cookieValue.substring(10) : cookieValue;
-            const sep = originalUri.includes("?") ? "&" : "?";
-            originalUri += sep + "__hdnea__=" + token;
-        }
+        let uri = request.uris[0];
 
-        // Wrap the final URL in the proxy
-        request.uris[0] = CONFIG.proxy + encodeURIComponent(originalUri);
+        // Only proxy Hotstar links (skip local blobs or ui scripts)
+        if (uri.includes('hotstar.com')) {
+            // Attach cookie token if present
+            if (cookieValue && !uri.includes("__hdnea__")) {
+                let cleanToken = cookieValue.replace("__hdnea__=", "");
+                uri += (uri.includes("?") ? "&" : "?") + "__hdnea__=" + cleanToken;
+            }
+            
+            // Wrap in Worker URL
+            request.uris[0] = CONFIG.proxy + encodeURIComponent(uri);
+        }
     });
 
     try {
+        await player.attach(video);
         await player.load(CONFIG.streamUrl);
-        console.log("Stream loaded successfully!");
+        video.muted = false; // Unmute once play starts
     } catch (e) {
-        console.error("Error loading stream:", e);
+        console.error("Load Error Code:", e.code, e);
     }
 }
 
-document.addEventListener('DOMContentLoaded', initPlayer);
+document.addEventListener('DOMContentLoaded', initApp);
 </script>
 </body>
 </html>
