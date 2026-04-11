@@ -1,111 +1,249 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotstar Ultra Bypass</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
-    <style>
-        body { margin: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: #fff; font-family: sans-serif; }
-        #video-container { width: 90%; max-width: 900px; aspect-ratio: 16/9; border: 1px solid #222; }
-        #status { margin-bottom: 10px; color: #00ff88; font-family: monospace; }
-        select { margin-top: 15px; padding: 10px; background: #111; color: #fff; border: 1px solid #333; width: 300px; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Star Sports // Dillzy </title>
+<meta name="referrer" content="no-referrer">
+<script src="https://cdn.jsdelivr.net/npm/shaka-player@4.16.2/dist/shaka-player.ui.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@4.16.2/dist/controls.css"/>
+
+    
+  <style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
+
+.shaka-video-container{
+position:fixed;
+inset:0;
+background:#000;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+
+video{
+width:100%;
+height:100%;
+object-fit:contain;
+background:#000;
+}
+
+.custom-watermark{
+position:absolute;
+z-index:40;
+pointer-events:none;
+top:65%;
+left:6%;
+transform:translateY(-50%);
+font-size:11px;
+font-weight:600;
+color:rgba(255,255,255,0.12);
+}
+
+/* --- Updated Modern Blocker Styles --- */
+.block-overlay{
+position:fixed;
+inset:0;
+z-index:99999;
+display:flex;
+align-items:center;
+justify-content:center;
+background:radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
+text-align:center;
+}
+
+.block-box{
+padding:40px;
+max-width:500px;
+width:90%;
+background:rgba(20, 20, 20, 0.95);
+border-radius:16px;
+border:1px solid rgba(255, 255, 255, 0.1);
+box-shadow:0 20px 50px rgba(0,0,0,0.5);
+animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+from { opacity: 0; transform: translateY(30px); }
+to { opacity: 1; transform: translateY(0); }
+}
+
+.block-title{
+font-size:42px;
+font-weight:800;
+color:#ffffff;
+text-transform:uppercase;
+letter-spacing:2px;
+margin-bottom:20px;
+text-shadow:0 0 10px rgba(255, 0, 0, 0.3);
+}
+
+.block-sub{
+font-size:14px;
+font-weight:500;
+color:rgba(255, 255, 255, 0.6);
+line-height:1.6;
+}
+
+/* Icon hidden as requested, but keeping structure if needed later */
+.block-icon{ display: none; }
+.block-note{ display: none; }
+
+@media(max-width:700px){
+.custom-watermark{font-size:9px;top:60%;left:16%}
+.block-title{font-size:28px}
+.block-box{padding:25px}
+.block-sub{font-size:12px}
+}
+</style>
+    
 </head>
+    
 <body>
 
-    <div id="status">Bypass Engine: Ready</div>
-    <div data-shaka-player-container id="video-container">
-        <video data-shaka-player id="video" autoplay style="width:100%; height:100%"></video>
-    </div>
-    <select id="channelList"><option>Fetching Streams...</option></select>
+<div class="shaka-video-container" id="player-container">
+<video id="video" autoplay muted playsinline preload="metadata"></video>
+<div class="custom-watermark"> </div>
+</div>
 
-    <script>
-        const COOKIE_JSON = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/cookie.json';
-        const DRM_JSON = 'https://raw.githubusercontent.com/hasanhabibmottakin/jch/main/drm.json';
-
-        let player;
-
-        async function initApp() {
-            shaka.polyfill.installAll();
-
-            const video = document.getElementById('video');
-            const container = document.getElementById('video-container');
-            player = new shaka.Player(video);
-            const ui = new shaka.ui.Overlay(player, container, video);
-
-            try {
-                const [cookieData, drmData] = await Promise.all([
-                    fetch(COOKIE_JSON).then(r => r.json()),
-                    fetch(DRM_JSON).then(r => r.json())
-                ]);
-
-                // --- THE URL REWRITE ENGINE ---
-                player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                    // Extract the raw cookie string
-                    const cookieStr = cookieData.Cookie;
-                    const ua = "Hotstar;in.startv.hotstar/25.02.24.8.11169 (Android/15)";
-                    const origin = cookieData.Origin;
-                    const referer = cookieData.Referer;
-
-                    // Construct the decoration string
-                    // We use encodeURIComponent to ensure special characters (~, =, /) don't break the URL
-                    const decoration = `|Cookie=${encodeURIComponent(cookieStr)}&User-agent=${encodeURIComponent(ua)}&Origin=${encodeURIComponent(origin)}&Referer=${encodeURIComponent(referer)}`;
-
-                    // Append to the URL. If URL already has ?, use &, else use ?
-                    if (request.uris[0].includes('?')) {
-                        request.uris[0] += `&${decoration}`;
-                    } else {
-                        request.uris[0] += `?${decoration}`;
-                    }
-                });
-
-                // Populate UI
-                const selector = document.getElementById('channelList');
-                selector.innerHTML = '';
-                drmData.forEach((ch, i) => {
-                    const opt = document.createElement('option');
-                    opt.value = i;
-                    opt.innerText = ch.name;
-                    selector.appendChild(opt);
-                });
-
-                selector.onchange = () => loadChannel(drmData[selector.value]);
-                
-                // Load default
-                loadChannel(drmData[0]);
-
-            } catch (e) {
-                document.getElementById('status').innerText = "Initialization Error";
-                console.error(e);
-            }
+<script>
+(function(){
+  
+  function isSandboxedEnv(){
+    try {
+      if (window.self === window.top) return false;
+      if (window.frameElement && window.frameElement.hasAttribute("sandbox")) {
+        return true;
+      }
+      try {
+        document.domain = document.domain;
+        if (window.frameElement && !window.frameElement.getAttribute("sandbox")) {
+             return false;
         }
+      } catch (e) {
+         return true;
+      }
+      return false;
+    } catch(e) {
+      return true;
+    }
+  }
+  function triggerBlockScreen(title, message){
+    const container = document.getElementById("player-container");
+    const video = document.getElementById("video");
+    
+    try {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    } catch(e){}
 
-        async function loadChannel(ch) {
-            document.getElementById('status').innerText = `Injecting Auth: ${ch.name}`;
-            const [kid, key] = ch.key.split(':');
+    const overlay = document.createElement("div");
+    overlay.className = "block-overlay";
+    overlay.id = "sandbox-block-display";
+    overlay.innerHTML = `
+      <div class="block-box">
+        <div class="block-title">${title}</div>
+        <div class="block-sub">${message}</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    container.style.display = 'none';
+  }
+  if(isSandboxedEnv()){
 
-            player.configure({
-                drm: {
-                    clearKeys: { [kid]: key }
-                },
-                streaming: {
-                    lowLatencyMode: true,
-                    jumpLargeGaps: true
-                }
-            });
+    triggerBlockScreen('Disable Sandbox', 'Opening Chrome Browser Only & Disable Ad blocker');
+    return;
+  }
+  const CONFIG={
+    streamUrl:"https://jiotvpllive.cdn.jio.com/bpk-tv/ColorsHD_MOB/WDVLive/index.mpd",
+    keyId:"d9025bf5bbe6502cab58edaa0b50750b",
+    key:"91b5ca6ebefe3a977cb6fcae31868664",
+    cookieUrl:"https://raw.githubusercontent.com/ascal-dev/matchlinks-jsontom3u/main/cookies.json"
+  };
 
-            try {
-                await player.load(ch.url);
-                document.getElementById('status').innerText = `Playing: ${ch.name}`;
-            } catch (e) {
-                document.getElementById('status').innerText = `Error ${e.code}: Check CORS Extension`;
-                console.error(e);
-            }
+  document.addEventListener("DOMContentLoaded",async()=>{
+
+    shaka.polyfill.installAll();
+    if(!shaka.Player.isBrowserSupported()) return;
+
+    const video=document.getElementById("video");
+    const container=document.getElementById("player-container");
+
+    video.muted=true;
+
+    const player=new shaka.Player();
+    await player.attach(video);
+
+    const ui=new shaka.ui.Overlay(player,container,video);
+
+    ui.configure({
+  addBigPlayButton: true,
+  controlPanelElements: [
+    "mute",           // First - volume/mute button
+    "play_pause",     // Second - play/pause button  
+    "time_and_duration", // Third - timeline timings (00:00 / 00:00)
+    "spacer",
+    "quality",
+    "picture_in_picture",
+    "fullscreen"
+  ],
+  seekBarColors: {
+    base: "white",
+    buffered: "red", 
+    played: "green"
+  }
+});
+
+    player.configure({
+      drm:{clearKeys:{[CONFIG.keyId]:CONFIG.key}},
+      manifest:{defaultPresentationDelay:5},
+      streaming:{
+        lowLatencyMode:true,
+        bufferingGoal:10,
+        rebufferingGoal:2,
+        safeSeekOffset:5
+      }
+    });
+
+    let cookieValue="";
+
+    try{
+      const response=await fetch(CONFIG.cookieUrl,{cache:"no-store"});
+      const data=await response.json();
+      cookieValue=data.cookie||"";
+    }catch(e){}
+
+    if(cookieValue){
+      player.getNetworkingEngine().registerRequestFilter((type,request)=>{
+        request.headers["Referer"]="https://www.jiotv.com/";
+        request.headers["User-Agent"]="plaYtv/7.1.5 (Linux;Android 13) ExoPlayerLib/2.11.6";
+        request.headers["Cookie"]=cookieValue;
+
+        let urlCookie=cookieValue.startsWith("__hdnea__=")?cookieValue.substring(10):cookieValue;
+
+        if((type===shaka.net.NetworkingEngine.RequestType.MANIFEST||
+        type===shaka.net.NetworkingEngine.RequestType.SEGMENT)&&
+        !request.uris[0].includes("__hdnea__")){
+          const sep=request.uris[0].includes("?")?"&":"?";
+          request.uris[0]+=sep+"__hdnea__="+urlCookie;
         }
+      });
+    }
 
-        document.addEventListener('shaka-ui-loaded', initApp);
-    </script>
+    try{
+      await player.load(CONFIG.streamUrl);
+      video.play().catch(()=>{});
+    }catch(e){}
+
+    video.addEventListener("play",()=>{
+      video.muted=false;
+    });
+
+  });
+})();
+</script>
+
 </body>
 </html>
