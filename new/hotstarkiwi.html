@@ -157,9 +157,9 @@ line-height:1.6;
     return;
   }
   const CONFIG={
-    streamUrl:"https://jiotvpllive.cdn.jio.com/bpk-tv/Colors_HD_MOB/WDVLive/index.mpd",
-    keyId:"d9025bf5bbe6502cab58edaa0b50750b",
-    key:"91b5ca6ebefe3a977cb6fcae31868664",
+    streamUrl:"https://livetv.hotstar.com/mp1/gec-india-1540065782/fce958099ca84fc3b980e651a4a668a8/index.mpd",
+    keyId:"b7cdde012ce04e90a08b90622e020000",
+    key:"13603245acab444faef6cab5198de55f",
     cookieUrl:"https://raw.githubusercontent.com/ascal-dev/matchlinks-jsontom3u/main/cookies.json"
   };
 
@@ -217,8 +217,8 @@ line-height:1.6;
 
     if(cookieValue){
       player.getNetworkingEngine().registerRequestFilter((type,request)=>{
-        request.headers["Referer"]="https://www.jiotv.com/";
-        request.headers["User-Agent"]="plaYtv/7.1.5 (Linux;Android 13) ExoPlayerLib/2.11.6";
+        request.headers["Referer"]="https://www.hotstar.com/";
+        request.headers["User-Agent"]="Hotstar;in.startv.hotstar/25.02.24.8.11169 (Android/15)";
         request.headers["Cookie"]=cookieValue;
 
         let urlCookie=cookieValue.startsWith("__hdnea__=")?cookieValue.substring(10):cookieValue;
