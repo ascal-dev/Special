@@ -180,32 +180,58 @@ line-height:1.6;
 
     ui.configure({
   addBigPlayButton: true,
+  ui.configure({
   controlPanelElements: [
-    "mute",           // First - volume/mute button
-    "play_pause",     // Second - play/pause button  
-    "time_and_duration", // Third - timeline timings (00:00 / 00:00)
-    "spacer",
-    "quality",
-    "picture_in_picture",
-    "fullscreen"
-  ],
-  seekBarColors: {
-    base: "white",
-    buffered: "red", 
-    played: "green"
-  }
-});
+    'play_pause',
+    'time_and_duration',
+    'mute',
+    'volume',
+    'spacer',
+    'language',
+    'captions',
+    'picture_in_picture',
+    'quality',
+    'fullscreen'
+      ],
+      volumeBarColors: {
+        base: 'rgba(63, 187, 1, 1)',
+        level: 'rgb(255, 69, 0)'
+      },
+      seekBarColors: {
+        base: 'rgb(41, 41, 163)',
+        buffered: 'rgb(35, 99, 3)',
+        played: 'rgba(63, 187, 1, 1)'
+      }
+    });
+ 
 
     player.configure({
       drm:{clearKeys:{[CONFIG.keyId]:CONFIG.key}},
-      manifest:{defaultPresentationDelay:5},
-      streaming:{
-        lowLatencyMode:true,
-        bufferingGoal:10,
-        rebufferingGoal:2,
-        safeSeekOffset:5
+      streaming: {
+        lowLatencyMode: true,
+        bufferingGoal: 15,
+        rebufferingGoal: 2,
+        bufferBehind: 15,
+    
+        retryParameters: {
+          timeout: 10000,
+          maxAttempts: 5,
+          baseDelay: 300,
+          backoffFactor: 1.2
+        },
+    
+        segmentRequestTimeout: 8000,
+        segmentPrefetchLimit: 2,
+        useNativeHlsOnSafari: true
+      },
+    
+      manifest: {
+        retryParameters: {
+          timeout: 8000,
+          maxAttempts: 3
+        }
       }
-    });
+});
 
     let cookieValue="";
 
