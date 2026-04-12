@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Star Sports // Dillzy </title>
+    <title>Star Sports // Live</title>
     <meta name="referrer" content="no-referrer">
     <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.16.2/dist/shaka-player.ui.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@4.16.2/dist/controls.css"/>
@@ -18,7 +18,7 @@
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
         }
 
-        .shaka-video-container {
+        #player-container {
             position: fixed;
             inset: 0;
             background: #000;
@@ -31,7 +31,6 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
-            background: #000;
         }
 
         .custom-watermark {
@@ -45,23 +44,18 @@
             font-weight: 600;
             color: rgba(255, 255, 255, 0.12);
         }
-
-        @media(max-width:700px) {
-            .custom-watermark { font-size: 9px; top: 60%; left: 16%; }
-        }
     </style>
 </head>
     
 <body>
 
-<div class="shaka-video-container" id="player-container" data-shaka-player-container>
-    <video id="video" autoplay muted playsinline preload="metadata" data-shaka-player></video>
+<div id="player-container" data-shaka-player-container>
+    <video id="video" autoplay muted playsinline data-shaka-player></video>
     <div class="custom-watermark"></div>
 </div>
 
 <script>
 (function() {
-    // Configuration
     const CONFIG = {
         streamUrl: "https://jiotvpllive.cdn.jio.com/bpk-tv/StarSportsHD2Hin_BTS/output/index.mpd",
         keyId: "bd1ea6a1c1fb5dcdb709434e0826bbc0",
@@ -71,10 +65,7 @@
 
     document.addEventListener("DOMContentLoaded", async () => {
         shaka.polyfill.installAll();
-        if (!shaka.Player.isBrowserSupported()) {
-            console.error("Browser not supported!");
-            return;
-        }
+        if (!shaka.Player.isBrowserSupported()) return;
 
         const video = document.getElementById("video");
         const container = document.getElementById("player-container");
@@ -82,9 +73,8 @@
         const player = new shaka.Player(video);
         const ui = new shaka.ui.Overlay(player, container, video);
 
-        // UI Configuration - FIXED syntax here
+        // UI Configuration (Applied exactly as requested)
         ui.configure({
-            addBigPlayButton: true,
             controlPanelElements: [
                 'play_pause',
                 'time_and_duration',
@@ -108,28 +98,34 @@
             }
         });
 
-        // Player DRM and Streaming Configuration
+        // DRM Setup
+        const drmConfig = {
+            clearKeys: {
+                [CONFIG.keyId]: CONFIG.key
+            }
+        };
+
+        // Player Configuration (Applied exactly as requested)
         player.configure({
-            drm: {
-                clearKeys: {
-                    [CONFIG.keyId]: CONFIG.key
-                }
-            },
+            drm: drmConfig,
             streaming: {
                 lowLatencyMode: true,
                 bufferingGoal: 15,
                 rebufferingGoal: 2,
                 bufferBehind: 15,
+
                 retryParameters: {
                     timeout: 10000,
                     maxAttempts: 5,
                     baseDelay: 300,
                     backoffFactor: 1.2
                 },
+
                 segmentRequestTimeout: 8000,
                 segmentPrefetchLimit: 2,
                 useNativeHlsOnSafari: true
             },
+
             manifest: {
                 retryParameters: {
                     timeout: 8000,
@@ -138,15 +134,13 @@
             }
         });
 
-        // Request Filter for Cookies/Headers
+        // Networking Engine Filters
         let cookieValue = "";
         try {
             const response = await fetch(CONFIG.cookieUrl, { cache: "no-store" });
             const data = await response.json();
             cookieValue = data.cookie || "";
-        } catch (e) {
-            console.error("Cookie fetch failed", e);
-        }
+        } catch (e) {}
 
         player.getNetworkingEngine().registerRequestFilter((type, request) => {
             request.headers["Referer"] = "https://www.jiotv.com/";
@@ -154,13 +148,13 @@
             
             if (cookieValue) {
                 request.headers["Cookie"] = cookieValue;
-                let urlCookie = cookieValue.startsWith("__hdnea__=") ? cookieValue.substring(10) : cookieValue;
+                let token = cookieValue.startsWith("__hdnea__=") ? cookieValue.substring(10) : cookieValue;
 
-                if ((type === shaka.net.NetworkingEngine.RequestType.MANIFEST ||
-                     type === shaka.net.NetworkingEngine.RequestType.SEGMENT) &&
+                if ((type === shaka.net.NetworkingEngine.RequestType.MANIFEST || 
+                     type === shaka.net.NetworkingEngine.RequestType.SEGMENT) && 
                     !request.uris[0].includes("__hdnea__")) {
                     const sep = request.uris[0].includes("?") ? "&" : "?";
-                    request.uris[0] += sep + "__hdnea__=" + urlCookie;
+                    request.uris[0] += sep + "__hdnea__=" + token;
                 }
             }
         });
@@ -169,17 +163,16 @@
         try {
             await player.load(CONFIG.streamUrl);
             video.play().catch(() => {
-                console.log("Autoplay blocked; waiting for user interaction.");
+                console.log("Autoplay blocked. Click the player to start audio.");
             });
         } catch (e) {
             console.error("Error loading stream", e);
         }
 
-        // Unmute on first play
+        // Auto-unmute on first play
         video.addEventListener("play", () => {
             video.muted = false;
         }, { once: true });
-
     });
 })();
 </script>
