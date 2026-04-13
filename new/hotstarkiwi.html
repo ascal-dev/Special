@@ -98,14 +98,9 @@
             }
         });
 
-        // DRM Setup
-        const drmConfig = {
-            clearKeys: {
-                [CONFIG.keyId]: CONFIG.key
-            }
-        };
+        
 
-          player.configure({
+      player.configure({
       drm:{clearKeys:{[CONFIG.keyId]:CONFIG.key}},
       manifest:{defaultPresentationDelay:5},
       streaming: {
