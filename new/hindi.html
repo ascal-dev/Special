@@ -60,7 +60,7 @@
         streamUrl: "https://jiotvpllive.cdn.jio.com/bpk-tv/Star_Sports_HD1_Hindi_BTS/output/index.mpd",
         keyId:"400131994b445d8c8817202248760fda",
         key:"2d56cb6f07a75b9aff165d534ae2bfc4",
-        cookieUrl:"https://raw.githubusercontent.com/ascal-dev/matchlinks-jsontom3u/main/cookies/starsportshd1hindi.json"
+        cookieUrl:"https://allrounder-live2.pages.dev/api/star-1-hindi.json"
     };
 
     document.addEventListener("DOMContentLoaded", async () => {
@@ -98,14 +98,9 @@
             }
         });
 
-        // DRM Setup
-        const drmConfig = {
-            clearKeys: {
-                [CONFIG.keyId]: CONFIG.key
-            }
-        };
+       
 
-          player.configure({
+      player.configure({
       drm:{clearKeys:{[CONFIG.keyId]:CONFIG.key}},
       manifest:{defaultPresentationDelay:5},
       streaming: {
