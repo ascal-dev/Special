@@ -106,33 +106,68 @@
         };
 
         // Player Configuration (Applied exactly as requested)
-        player.configure({
-            drm: drmConfig,
-            streaming: {
-                lowLatencyMode: true,
-                bufferingGoal: 15,
-                rebufferingGoal: 2,
-                bufferBehind: 15,
-
-                retryParameters: {
-                    timeout: 10000,
-                    maxAttempts: 5,
-                    baseDelay: 300,
-                    backoffFactor: 1.2
-                },
-
-                segmentRequestTimeout: 8000,
-                segmentPrefetchLimit: 2,
-                useNativeHlsOnSafari: true
-            },
-
-            manifest: {
-                retryParameters: {
-                    timeout: 8000,
-                    maxAttempts: 3
-                }
-            }
-        });
+          player.configure({
+      drm:{clearKeys:{[CONFIG.keyId]:CONFIG.key}},
+      manifest:{defaultPresentationDelay:5},
+      streaming: {
+                        lowLatencyMode: true,
+                        bufferingGoal: 60, // Increased from 15 to 60 seconds
+                        rebufferingGoal: 20, // Increased from 2 to 20 seconds
+                        bufferBehind: 30, // Increased from 15 to 30 seconds
+                        alwaysStreaming: true, // Enable always streaming mode
+                        retryParameters: {
+                            timeout: 15000, // Increased from 10000 to 15000
+                            maxAttempts: 10, // Increased from 5 to 10
+                            baseDelay: 500, // Increased from 300 to 500
+                            backoffFactor: 1.5 // Increased from 1.2 to 1.5
+                        },
+                        segmentRequestTimeout: 15000, // Increased from 8000 to 15000
+                        segmentPrefetchLimit: 10, // Increased from 2 to 10
+                        useNativeHlsOnSafari: true,
+                        smallGapLimit: 0.5, // Add small gap handling
+                        jumpLargeGaps: true, // Jump large gaps instead of stalling
+                        stallEnabled: true, // Enable stall detection
+                        stallThreshold: 2, // Stall threshold in seconds
+                        rebufferingEnabled: true, // Enable rebuffering
+                        durationBackoff: 1, // Duration backoff
+                        ignoreTextStreamFailures: true, // Ignore text stream failures
+                        ignoreManifestUpdateFailures: true, // Ignore manifest update failures
+                        manifestUpdateRetryParameters: {
+                            timeout: 10000,
+                            maxAttempts: 5
+                        }
+                    },
+                    manifest: {
+                        retryParameters: {
+                            timeout: 15000, // Increased from 8000 to 15000
+                            maxAttempts: 10, // Increased from 3 to 10
+                            backoffFactor: 1.5
+                        },
+                        dash: {
+                            ignoreMinBufferTime: true, // Ignore min buffer time from manifest
+                            autoCorrectDrift: true, // Auto correct drift
+                            initialSegmentLimit: 2000 // Increased segment limit
+                        }
+                    },
+                    offline: {
+                        usePersistentLicense: false
+                    },
+                    abr: {
+                        enabled: true,
+                        defaultBandwidthEstimate: 8000000, // 8 Mbps default bandwidth
+                        switchInterval: 2, // Check ABR every 2 seconds
+                        bandwidthUpgradeTarget: 0.7, // Upgrade at 70% usage
+                        bandwidthDowngradeTarget: 0.5, // Downgrade at 50% usage
+                        restrictions: {
+                            minWidth: 320,
+                            maxWidth: 1920,
+                            minHeight: 240,
+                            maxHeight: 1080,
+                            minPixels: 76800,
+                            maxPixels: 2073600
+                        }
+                    }
+    });
 
         // Networking Engine Filters
         let cookieValue = "";
