@@ -3,138 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream Player</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.js"></script>
+    <title>Dynamic Shaka Player</title>
+    <!-- Shaka Player UI Assets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.min.css">
+    
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #000;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* Container that scales with the viewport */
-        .shaka-video-container {
-            width: 100%;
-            max-width: 1200px;
-            height: auto;
-            aspect-ratio: 16 / 9;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            background-color: #000;
-        }
-
-        video {
-            width: 100%;
-            height: 100%;
-        }
-
-        /* Minimal adjustments to UI overlay to keep it clean */
-        .shaka-controls-container .shaka-bottom-controls {
-            display: flex;
-            flex-direction: column;
-        }
+        body { font-family: sans-serif; background: #121212; color: white; margin: 0; padding: 20px; }
+        #video-container { max-width: 800px; margin: 0 auto; background: black; position: relative; }
+        video { width: 100%; aspect-ratio: 16/9; }
         
-        /* Hiding specific elements you mentioned removing */
-        .channel-info, #status {
-            display: none !important;
-        }
+        .controls-row { max-width: 800px; margin: 20px auto; display: flex; gap: 10px; }
+        input, select { padding: 10px; border-radius: 4px; border: 1px solid #333; background: #1e1e1e; color: white; flex: 1; }
+        
+        #channel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; max-width: 1000px; margin: 20px auto; }
+        .card { background: #1e1e1e; padding: 10px; border-radius: 8px; text-align: center; cursor: pointer; border: 1px solid transparent; transition: 0.2s; }
+        .card:hover { border-color: #e8534a; background: #252525; }
+        .card img { width: 60px; height: 60px; object-fit: contain; margin-bottom: 8px; }
+        .card p { margin: 5px 0; font-size: 14px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #e8534a; padding: 10px 20px; border-radius: 20px; display: none; z-index: 1000; }
+        #toast.show { display: block; }
     </style>
 </head>
 <body>
 
-    <div class="shaka-video-container" id="player-container" data-shaka-player-container>
-        <video id="video" autoplay playsinline preload="metadata" data-shaka-player></video>
+    <div id="video-container" data-shaka-player-container>
+        <video id="video" autoplay></video>
     </div>
 
-    <script>
-        /* ── CONFIGURATION RECEIVED FROM SE ── */
-        const SERVER_CONFIG = {
-            "hasChannel": true,
-            "streamUrls": ["https:\/\/jiotvmblive.cdn.jio.com\/bpk-tv\/ColorsHD_MOB\/WDVLive\/index.mpd"],
-            "primaryCookie": "__hdnea__=st=1777003233~exp=1777024833~acl=\/*~hmac=f283c9c7a32bd6fccf7613fe4eee7097499ccdbdc4def893c20efdadbda31364",
-            "fallbackCookie": "",
-            "keyId": "d80955a9801d8419a9152bb4d21e0635",
-            "key": "4bf8a1bafaca34d3f59515fec005f8e7"
-        };
+    <div class="controls-row">
+        <input type="text" id="search" placeholder="Search channels..." oninput="filterChannels()">
+        <select id="category" onchange="filterChannels()">
+            <option value="all">All Categories</option>
+        </select>
+    </div>
 
-        document.addEventListener("DOMContentLoaded", async () => {
-            if (!SERVER_CONFIG.hasChannel || SERVER_CONFIG.streamUrls.length === 0) return;
+    <div id="channel-grid"></div>
+    <div id="toast"></div>
 
-            const { streamUrls, primaryCookie, fallbackCookie, keyId, key } = SERVER_CONFIG;
+<script>
+// ===== GLOBAL STATE =====
+let shakaPlayer = null;
+let allChannels = [];
+let streamConfig = {}; // Dynamically updated
 
-            shaka.polyfill.installAll();
-            if (!shaka.Player.isBrowserSupported()) return;
-
-            const videoEl = document.getElementById("video");
-            const container = document.getElementById("player-container");
-
-            // Initialize Player and UI
-            const player = new shaka.Player(videoEl);
-            const ui = new shaka.ui.Overlay(player, container, videoEl);
-            
-            // Customize UI controls (optional)
-            ui.configure({
-                'controlPanelElements': ['play_pause', 'time_and_duration', 'spacer', 'mute', 'volume', 'fullscreen', 'overflow_menu'],
-                'addLanguageControls': false
-            });
-
-            // Configure DRM and Streaming
-            const config = {
-                streaming: { 
-                    lowLatencyMode: true,
-                    bufferingGoal: 10,
-                    rebufferingGoal: 2
-                }
-            };
-
-            if (keyId && key) {
-                config.drm = {
-                    clearKeys: { [keyId]: key }
-                };
-            }
-            player.configure(config);
-
-            // Request Filter for Headers and Cookies
-            player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                request.headers["Referer"] = "https://www.jiotv.com/";
-                request.headers["User-Agent"] = "plaYtv/7.1.5";
-
-                if (primaryCookie && (type === shaka.net.NetworkingEngine.RequestType.MANIFEST || 
-                                     type === shaka.net.NetworkingEngine.RequestType.SEGMENT)) {
-                    const separator = request.uris[0].includes('?') ? '&' : '?';
-                    request.uris[0] = request.uris[0].split("?")[0] + "?" + primaryCookie;
-                }
-            });
-
-            // Load logic with fallback support
-            const cookieRounds = [primaryCookie];
-            if (fallbackCookie && fallbackCookie !== primaryCookie) cookieRounds.push(fallbackCookie);
-
-            let loaded = false;
-            
-            for (const cookie of cookieRounds) {
-                for (const url of streamUrls) {
-                    try {
-                        await player.load(url);
-                        videoEl.play().catch(() => {
-                            // Handle potential Autoplay block
-                            console.log("Autoplay blocked, waiting for user interaction.");
-                        });
-                        loaded = true;
-                        break;
-                    } catch (e) {
-                        console.error("Load attempt failed for URL:", url);
-                    }
-                }
-                if (loaded) break;
-            }
+// ===== LOAD DATA FROM JSON =====
+async function loadData() {
+    try {
+        const res = await fetch('https://raw.githubusercontent.com/ascal-dev/matchlinks-jsontom3u/main/tplyfaster.json');
+        const data = await res.json();
+        
+        // Filter: DRM not empty AND Token not empty
+        allChannels = data.filter(ch => {
+            const hasDrm = ch.drm && Object.keys(ch.drm).length > 0;
+            const hasToken = ch.token && ch.token.length > 10;
+            return hasDrm && hasToken;
         });
-    </script>
+
+        populateCategories();
+        renderChannels(allChannels);
+    } catch (e) {
+        showToast("Failed to load channel data");
+    }
+}
+
+function populateCategories() {
+    const cats = [...new Set(allChannels.map(ch => ch.category))];
+    const select = document.getElementById('category');
+    cats.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        select.appendChild(opt);
+    });
+}
+
+function renderChannels(list) {
+    const grid = document.getElementById('channel-grid');
+    grid.innerHTML = list.map(ch => `
+        <div class="card" onclick="selectChannel('${ch.id}')">
+            <img src="${ch.logo}" onerror="this.src='https://via.placeholder.com/60'">
+            <p>${ch.name}</p>
+            <small style="color:#888">${ch.category}</small>
+        </div>
+    `).join('');
+}
+
+function filterChannels() {
+    const query = document.getElementById('search').value.toLowerCase();
+    const cat = document.getElementById('category').value;
+    const filtered = allChannels.filter(ch => {
+        const matchesName = ch.name.toLowerCase().includes(query);
+        const matchesCat = cat === 'all' || ch.category === cat;
+        return matchesName && matchesCat;
+    });
+    renderChannels(filtered);
+}
+
+function selectChannel(id) {
+    const channel = allChannels.find(c => c.id === id);
+    if (!channel) return;
+
+    // Map JSON to your existing streamConfig structure
+    streamConfig = {
+        name: channel.name,
+        mpd: channel.mpd,
+        // Extract the hdnea part from the token URL
+        token: channel.token, 
+        referer: channel.referer,
+        userAgent: channel.userAgent,
+        drm: channel.drm
+    };
+
+    showToast(`Loading: ${streamConfig.name}`);
+    configureShakaPlayer(streamConfig.mpd);
+}
+
+// ===== YOUR ORIGINAL SHAKA LOGIC (UNCHANGED) =====
+document.addEventListener('DOMContentLoaded', async () => {
+    shaka.polyfill.installAll();
+    if (!shaka.Player.isBrowserSupported()) {
+        alert('Browser not supported');
+        return;
+    }
+
+    const video = document.getElementById('video');
+    const videoContainer = document.querySelector('[data-shaka-player-container]');
+    shakaPlayer = new shaka.Player(video);
+    const ui = new shaka.ui.Overlay(shakaPlayer, videoContainer, video);
+
+    ui.configure({
+        controlPanelElements: ['play_pause', 'time_and_duration', 'spacer', 'language', 'mute', 'fullscreen', 'quality', 'overflow_menu'],
+        overflowMenuButtons: ['captions', 'playback_rate'],
+    });
+
+    loadData(); // Start the loading process
+});
+
+function configureShakaPlayer(mpdUrl) {
+    shakaPlayer.configure({
+        drm: { clearKeys: streamConfig.drm },
+        streaming: {
+            bufferingGoal: 30,
+            rebufferingGoal: 15,
+            retryParameters: { maxAttempts: 5 }
+        }
+    });
+
+    shakaPlayer.getNetworkingEngine().clearAllRequestFilters();
+    shakaPlayer.getNetworkingEngine().registerRequestFilter((type, request) => {
+        request.headers['Referer'] = streamConfig.referer;
+        request.headers['User-Agent'] = streamConfig.userAgent;
+        if ((type === shaka.net.NetworkingEngine.RequestType.MANIFEST ||
+             type === shaka.net.NetworkingEngine.RequestType.SEGMENT) &&
+            !request.uris[0].includes('__hdnea')) {
+            const sep = request.uris[0].includes('?') ? '&' : '?';
+            request.uris[0] += sep + streamConfig.token;
+        }
+    });
+
+    shakaPlayer.load(mpdUrl).then(() => {
+        console.log('Stream loaded:', mpdUrl);
+    }).catch(e => {
+        console.error('Load error', e);
+        showToast("Error loading channel");
+    });
+}
+
+// ===== TOAST UTILITY =====
+let toastTimer = null;
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+</script>
 </body>
 </html>
